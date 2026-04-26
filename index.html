@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Beam Analysis — SFD & BMD</title>
+<style>
+/* ===== GLOBAL RESET & BASE ===== */
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0b0f14;color:#d1d5db;min-height:100vh;overflow-x:hidden;}
+
+/* ===== TOP TOOLBAR ===== */
+#topbar{background:#141a23;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid #1e293b;position:sticky;top:0;z-index:50;}
+button{padding:7px 14px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#fff;}
+button:hover{filter:brightness(1.2);transform:translateY(-1px);}
+button:active{transform:translateY(0);filter:brightness(1);}
+button:focus-visible{outline:2px solid #facc15;outline-offset:2px;}
+.btn-sup{background:#2563eb;}.btn-load{background:#dc2626;}.btn-udl{background:#d97706;}
+.btn-uvl{background:#0891b2;}.btn-moment{background:#7c3aed;}.btn-del{background:#6b21a8;}.btn-reset{background:#475569;}.btn-calc{background:#16a34a;}
+#topbar label{font-size:12px;color:#94a3b8;margin-left:4px;}
+#topbar input,#topbar select{padding:6px 10px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#fff;font-size:13px;width:auto;}
+#topbar select{min-width:70px;}
+.sep{width:1px;height:28px;background:#1e293b;margin:0 4px;}
+
+/* ===== WARNING BAR ===== */
+#warning{display:none;padding:10px 16px;font-size:12px;font-weight:600;border-radius:0;margin:0;border:none;line-height:1.5;}
+#warning.show{display:flex;align-items:center;gap:8px;}
+#warning.warn-yellow{background:#78350f;border-bottom:1px solid #d97706;color:#fde68a;}
+#warning.warn-red{background:#7f1d1d;border-bottom:1px solid #dc2626;color:#fca5a5;}
+#warning.warn-blue{background:#1e3a5f;border-bottom:1px solid #2563eb;color:#93c5fd;}
+
+/* ===== BEAM CANVAS ===== */
+#beamBox{width:96%;max-width:1400px;height:340px;margin:12px auto;background:#fff;border-radius:12px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.5);touch-action:none;}
+#beam{position:absolute;top:180px;left:5%;width:90%;height:8px;background:linear-gradient(180deg,#374151,#111827);border-radius:2px;z-index:2;}
+#beamScale{position:absolute;top:195px;left:5%;width:90%;height:28px;z-index:1;}
+.tick{position:absolute;bottom:0;width:1px;background:#9ca3af;transform:translateX(-.5px);}
+.tick.minor{height:6px;}.tick.major{height:14px;background:#374151;}
+.tick-label{position:absolute;bottom:15px;font-size:9px;color:#374151;font-weight:700;transform:translateX(-50%);white-space:nowrap;}
+
+/* ===== SUPPORT ELEMENTS ===== */
+.support{position:absolute;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:24px solid #2563eb;cursor:grab;z-index:5;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));top:183px;}
+.support::after{content:'';position:absolute;top:24px;left:-18px;width:36px;height:3px;background:#2563eb;border-radius:2px;}
+.support.roller::before{content:'';position:absolute;top:27px;left:-10px;width:20px;height:6px;border-radius:50%;border:2px solid #2563eb;background:#fff;}
+.support.fixed-sup{border-left:14px solid transparent;border-right:14px solid transparent;border-top:0;border-bottom:24px solid #2563eb;top:156px;}
+.support.fixed-sup::after{content:'';position:absolute;top:-6px;left:-20px;width:40px;height:6px;background:#2563eb;border-radius:2px;}
+.support.fixed-sup::before{display:none;}
+
+/* ===== POINT LOAD ELEMENTS ===== */
+.load-el{position:absolute;width:3px;height:50px;background:linear-gradient(180deg,#ef4444,#b91c1c);cursor:grab;z-index:5;border-radius:1px 1px 0 0;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4));top:125px;}
+.load-el::after{content:'';position:absolute;bottom:-11px;left:-7px;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #ef4444;}
+
+/* ===== UDL ELEMENTS ===== */
+.udl-el{position:absolute;height:10px;background:repeating-linear-gradient(180deg,rgba(251,146,60,.8) 0px,rgba(251,146,60,.8) 3px,rgba(234,88,12,.6) 3px,rgba(234,88,12,.6) 6px);top:140px;cursor:grab;z-index:4;border-radius:2px;border:1px solid rgba(234,88,12,.9);}
+.udl-el::before,.udl-el::after{content:'';position:absolute;width:2px;height:30px;background:#d97706;top:-28px;}
+.udl-el::before{left:0;}.udl-el::after{right:0;}
+
+/* ===== UVL ELEMENTS ===== */
+.uvl-el{position:absolute;top:140px;cursor:grab;z-index:4;}
+.uvl-fill{position:absolute;top:0;left:0;width:100%;height:10px;background:rgba(8,145,178,.5);border:1px solid rgba(8,145,178,.8);border-radius:2px;}
+.uvl-left-line{position:absolute;width:2px;top:-28px;left:0;height:30px;background:#0891b2;}
+.uvl-right-line{position:absolute;width:2px;top:-28px;right:0;height:30px;background:#0891b2;}
+.uvl-zero-line{position:absolute;width:2px;top:-28px;height:30px;background:#0891b2;}
+.uvl-right-hatch{position:absolute;right:-1px;top:0;width:2px;height:38px;background:repeating-linear-gradient(180deg,#0891b2 0px,#0891b2 4px,transparent 4px,transparent 8px);}
+
+/* ===== MOMENT ELEMENTS ===== */
+.moment-el{position:absolute;top:165px;cursor:grab;z-index:5;}
+.moment-circle{width:28px;height:28px;border:3px solid #7c3aed;border-radius:50%;background:rgba(124,58,237,.1);position:relative;}
+.moment-arrow-cw,.moment-arrow-ccw{position:absolute;width:0;height:0;border:6px solid transparent;}
+.moment-arrow-cw{border-bottom-color:#7c3aed;top:-2px;right:0;border-left:none;border-top:none;}
+.moment-arrow-ccw{border-top-color:#7c3aed;bottom:-2px;right:0;border-left:none;border-bottom:none;}
+.moment-tail-cw{position:absolute;width:2px;height:10px;background:#7c3aed;top:6px;right:12px;}
+.moment-tail-ccw{position:absolute;width:2px;height:10px;background:#7c3aed;bottom:6px;right:12px;}
+
+/* ===== SHARED LABELS ===== */
+.el-label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#111;font-weight:700;background:rgba(255,255,255,.9);padding:2px 5px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:6;box-shadow:0 1px 4px rgba(0,0,0,.15);}
+.pos-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:9px;color:#374151;font-weight:700;pointer-events:none;z-index:6;}
+.selected-el{outline:2px solid #facc15!important;outline-offset:3px;border-radius:2px;}
+
+/* ===== INFO CARDS ===== */
+#info{padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;max-width:1400px;margin:0 auto;}
+.info-card{background:#141a23;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;}
+.info-card .lbl{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.info-card .val{font-size:15px;font-weight:700;font-family:'Courier New',monospace;line-height:1.4;}
+.val-ra{color:#60a5fa;}.val-rb{color:#818cf8;}.val-rm{color:#c084fc;}.val-vmax{color:#f87171;}.val-mmax{color:#34d399;}.val-zs{color:#fbbf24;}
+.val-sub{font-size:11px;color:#64748b;font-weight:400;}
+
+/* ===== CHARTS ===== */
+.charts{padding:0 12px 20px;max-width:1400px;margin:0 auto;}
+.chart-wrap{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:14px;margin-bottom:16px;}
+.chart-title{font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:8px;letter-spacing:.3px;}
+.chart-container{position:relative;width:100%;height:240px;}
+.chart-container canvas{width:100%!important;height:100%!important;}
+
+/* ===== EDIT PANEL ===== */
+#editPanel{position:fixed;top:0;right:-380px;width:360px;height:100vh;background:#141a23;border-left:1px solid #1e293b;z-index:100;transition:right .3s ease;padding:20px;overflow-y:auto;}
+#editPanel.open{right:0;}
+#editPanel h3{font-size:15px;color:#f8fafc;margin-bottom:16px;}
+#editPanel label{font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;margin-top:12px;}
+#editPanel label:first-child{margin-top:0;}
+#editPanel input,#editPanel select{width:100%;padding:8px 10px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#fff;font-size:13px;}
+#editPanel button{width:100%;margin-top:16px;}
+#editOverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;display:none;}
+#editOverlay.open{display:block;}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:700px){
+#topbar{gap:6px;padding:8px 10px;}
+#topbar label{display:none;}
+#topbar .sep{display:none;}
+button{padding:6px 10px;font-size:12px;}
+#beamBox{height:260px;}
+#beam{top:140px;}
+.load-el{height:38px;}.load-el::after{bottom:-9px;left:-5px;border-left-width:7px;border-right-width:7px;border-top-width:11px;}
+.udl-el{top:105px;}.udl-el::before,.udl-el::after{top:-8px;height:20px;}
+.uvl-el{top:105px;}.uvl-left-line,.uvl-right-line,.uvl-zero-line{top:-8px;height:20px;}
+.moment-el{top:120px;}
+#beamScale{top:155px;}
+.el-label{top:-18px;font-size:9px;}
+.chart-container{height:180px;}
+#editPanel{width:100%;right:-100%;}
+#info{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:400px){
+#info{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== TOOLBAR ===== -->
+<div id="topbar">
+  <button class="btn-sup" onclick="BeamApp.addSupport()">Pin</button>
+  <button class="btn-sup" onclick="BeamApp.addSupport('roller')">Roller</button>
+  <button class="btn-sup" onclick="BeamApp.addSupport('fixed')">Fixed</button>
+  <div class="sep"></div>
+  <button class="btn-load" onclick="BeamApp.addLoad()">Point Load</button>
+  <button class="btn-udl" onclick="BeamApp.addUDL()">UDL</button>
+  <button class="btn-uvl" onclick="BeamApp.addUVL()">UVL</button>
+  <button class="btn-moment" onclick="BeamApp.addMoment()">Moment</button>
+  <div class="sep"></div>
+  <button class="btn-del" onclick="BeamApp.deleteSelected()">Delete</button>
+  <button class="btn-reset" onclick="BeamApp.resetAll()">Reset</button>
+  <div class="sep"></div>
+  <label>Unit</label>
+  <select id="unitSelect" onchange="BeamApp.onUnitChange()">
+    <option value="N">N</option>
+    <option value="kg">kg</option>
+  </select>
+  <label>Length (m)</label>
+  <input id="L" type="number" value="10" min="1" max="100" step="0.5" oninput="BeamApp.onBeamLengthChange()">
+</div>
+
+<!-- ===== WARNING ===== -->
+<div id="warning"></div>
+
+<!-- ===== BEAM VISUAL ===== -->
+<div id="beamBox">
+  <div id="beam"></div>
+  <div id="beamScale"></div>
+</div>
+
+<!-- ===== INFO CARDS ===== -->
+<div id="info"></div>
+
+<!-- ===== CHARTS ===== -->
+<div class="charts">
+  <div class="chart-wrap">
+    <div class="chart-title">SHEAR FORCE DIAGRAM (SFD) — Piecewise Linear</div>
+    <div class="chart-container"><canvas id="sfd"></canvas></div>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-title">BENDING MOMENT DIAGRAM (BMD) — Sagging (+) / Hogging (−)</div>
+    <div class="chart-container"><canvas id="bmd"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== EDIT PANEL ===== -->
+<div id="editOverlay" onclick="BeamApp.closeEdit()"></div>
+<div id="editPanel">
+  <h3>Edit Element</h3>
+  <div id="editContent"></div>
+</div>
+
+<!-- ===== LOAD CHART.JS ===== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
+
+<script>
+/**
+ * BeamApp — Complete Beam Analysis Tool
+ * Supports: Pin, Roller, Fixed supports | Point loads, UDL, UVL, Moments
+ * Computes reactions, SFD (piecewise linear), BMD (parabolic where required)
+ * Sign convention: Sagging = +, Hogging = −
+ */
+var BeamApp = (function() {
+    'use strict';
+
+    /* ============================
+       STATE VARIABLES
+       ============================ */
+    var elements = [];       // Array of all beam elements (supports, loads, UDLs, UVLs, moments)
+    var selectedId = null;   // ID of currently selected element (or null)
+    var nextId = 1;          // Auto-incrementing ID counter
+    var sfdChart = null;     // Chart.js instance for SFD
+    var bmdChart = null;     // Chart.js instance for BMD
+    var chartsReady = false; // Flag: true when Chart.js and annotation plugin are loaded
+
+    // DOM references (set in init)
+    var boxEl = null;
+    var warnEl = null;
+    var infoEl = null;
+    var lengthInput = null;
+    var unitSelect = null;
+
+    /* ============================
+       UTILITY FUNCTIONS
+       ============================ */
+
+    /**
+     * Clamp a value between min and max
+     * @param {number} v - Value to clamp
+     * @param {number} mn - Minimum
+     * @param {number} mx - Maximum
+     * @returns {number} Clamped value
+     */
+    function clamp(v, mn, mx) {
+        return Math.max(mn, Math.min(mx, v));
+    }
+
+    /**
+     * Get current beam length in meters
+     * @returns {number} Beam length
+     */
+    function getBeamLength() {
+        return Math.max(1, parseFloat(lengthInput.value) || 10);
+    }
+
+    /**
+     * Get current unit system ('N' or 'kg')
+     * @returns {string} Unit string
+     */
+    function getUnit() {
+        return unitSelect.value;
+    }
+
+    /**
+     * Convert a value in N to display string with current unit
+     * @param {number} nVal - Value in Newtons
+     * @returns {string} Display string
+     */
+    function formatForceN(nVal) {
+        if (getUnit() === 'kg') {
+            return (nVal / 9.81).toFixed(2) + ' kg';
+        }
+        return nVal.toFixed(2) + ' N';
+    }
+
+    /**
+     * Get beam drawing area (origin x, width in px)
+     * @returns {{o: number, w: number}} Origin and width
+     */
+    function getBeamGeom() {
+        var W = boxEl.offsetWidth;
+        return { o: W * 0.05, w: W * 0.90 };
+    }
+
+    /**
+     * Convert meters to pixels (x position on beam)
+     * @param {number} m - Position in meters
+     * @returns {number} Pixel x position
+     */
+    function mToPx(m) {
+        var L = getBeamLength();
+        var b = getBeamGeom();
+        return b.o + (m / L) * b.w;
+    }
+
+    /**
+     * Convert pixels to meters
+     * @param {number} px - Pixel x position
+     * @returns {number} Position in meters
+     */
+    function pxToM(px) {
+        var L = getBeamLength();
+        var b = getBeamGeom();
+        var x = clamp(px - b.o, 0, b.w);
+        return (x / b.w) * L;
+    }
+
+    /**
+     * Snap a pixel position to nearest 0.5m grid
+     * @param {number} px - Raw pixel position
+     * @returns {{px: number, m: number}} Snapped pixel and meter values
+     */
+    function snapToGrid(px) {
+        var L = getBeamLength();
+        var b = getBeamGeom();
+        var x = clamp(px - b.o, 0, b.w);
+        var m = (x / b.w) * L;
+        // Snap to 0.5m grid — no floating point drift
+        m = Math.round(m * 2) / 2;
+        m = clamp(m, 0, L);
+        return { px: b.o + (m / L) * b.w, m: m };
+    }
+
+    /* ============================
+       ELEMENT CREATION
+       ============================ */
+
+    /**
+     * Add a support element to the beam
+     * @param {string} [supportType='pin'] - 'pin', 'roller', or 'fixed'
+     */
+    function addSupport(supportType) {
+        supportType = supportType || 'pin';
+        var L = getBeamLength();
+        var defaultX = supportType === 'fixed' ? 0 : (elements.filter(function(e){ return e.type==='support'; }).length === 0 ? 0 : L);
+        var el = {
+            id: nextId++,
+            type: 'support',
+            x: defaultX,
+            supportType: supportType,
+            dom: null
+        };
+        elements.push(el);
+        createDOM(el);
+        recalc();
+    }
+
+    /**
+     * Add a point load element via inline prompts
+     */
+    function addLoad() {
+        var unit = getUnit();
+        var label = unit === 'kg' ? 'kg' : 'N';
+        var val = prompt('Enter load value (' + label + '):', unit === 'kg' ? '500' : '5000');
+        if (!val || isNaN(val)) return;
+        var forceN = Math.abs(parseFloat(val));
+        if (unit === 'kg') forceN = forceN * 9.81;
+        var el = {
+            id: nextId++,
+            type: 'load',
+            x: getBeamLength() / 2,
+            force: forceN,
+            displayVal: Math.abs(parseFloat(val)),
+            displayUnit: unit,
+            dom: null
+        };
+        elements.push(el);
+        createDOM(el);
+        recalc();
+    }
+
+    /**
+     * Add a UDL (Uniformly Distributed Load) element via prompts
+     */
+    function addUDL() {
+        var unit = getUnit();
+        var wLabel = unit === 'kg' ? 'kg/m' : 'N/m';
+        var wVal = prompt('Enter UDL intensity (' + wLabel + '):', unit === 'kg' ? '100' : '1000');
+        if (!wVal || isNaN(wVal)) return;
+        var wN = Math.abs(parseFloat(wVal));
+        if (unit === 'kg') wN = wN * 9.81;
+        var sVal = prompt('Enter span length (m):', '3');
+        if (!sVal || isNaN(sVal)) return;
+        var el = {
+            id: nextId++,
+            type: 'udl',
+            x: 2,
+            w: wN,
+            span: Math.max(0.5, parseFloat(sVal)),
+            displayW: Math.abs(parseFloat(wVal)),
+            displayWUnit: unit,
+            dom: null
+        };
+        elements.push(el);
+        createDOM(el);
+        recalc();
+    }
+
+    /**
+     * Add a UVL (Uniformly Varying Load / triangular load) element via prompts
+     * Always zero at start, peak at end (for simplicity; direction can be flipped by position)
+     */
+    function addUVL() {
+        var unit = getUnit();
+        var wLabel = unit === 'kg' ? 'kg/m' : 'N/m';
+        var wVal = prompt('Enter peak intensity at end (' + wLabel + '):', unit === 'kg' ? '100' : '1000');
+        if (!wVal || isNaN(wVal)) return;
+        var wN = Math.abs(parseFloat(wVal));
+        if (unit === 'kg') wN = wN * 9.81;
+        var sVal = prompt('Enter span length (m):', '3');
+        if (!sVal || isNaN(sVal)) return;
+        var el = {
+            id: nextId++,
+            type: 'uvl',
+            x: 2,
+            wPeak: wN,
+            span: Math.max(0.5, parseFloat(sVal)),
+            displayW: Math.abs(parseFloat(wVal)),
+            displayWUnit: unit,
+            dom: null
+        };
+        elements.push(el);
+        createDOM(el);
+        recalc();
+    }
+
+    /**
+     * Add a moment load element via prompts
+     * @param {string} [direction='cw'] - 'cw' (clockwise) or 'ccw' (counterclockwise)
+     */
+    function addMoment(direction) {
+        direction = direction || 'cw';
+        var unit = getUnit();
+        var label = unit === 'kg' ? 'kg·m' : 'N·m';
+        var val = prompt('Enter moment value (' + label + '):', unit === 'kg' ? '100' : '1000');
+        if (!val || isNaN(val)) return;
+        var momentN = Math.abs(parseFloat(val));
+        if (unit === 'kg') momentN = momentN * 9.81;
+        var el = {
+            id: nextId++,
+            type: 'moment',
+            x: getBeamLength() / 2,
+            moment: momentN,
+            direction: direction,
+            displayVal: Math.abs(parseFloat(val)),
+            displayUnit: unit,
+            dom: null
+        };
+        elements.push(el);
+        createDOM(el);
+        recalc();
+    }
+
+    /**
+     * Delete the currently selected element
+     */
+    function deleteSelected() {
+        if (selectedId === null) return;
+        var idx = elements.findIndex(function(e) { return e.id === selectedId; });
+        if (idx >= 0) {
+            if (elements[idx].dom) elements[idx].dom.remove();
+            elements.splice(idx, 1);
+        }
+        selectedId = null;
+        closeEdit();
+        recalc();
+    }
+
+    /**
+     * Reset all elements to default demo configuration
+     */
+    function resetAll() {
+        elements.forEach(function(e) { if (e.dom) e.dom.remove(); });
+        elements = [];
+        selectedId = null;
+        warnEl.style.display = 'none';
+        warnEl.className = '';
+        // Re-create default demo
+        elements = [
+            { id: nextId++, type: 'support', x: 0, supportType: 'pin', dom: null },
+            { id: nextId++, type: 'support', x: 10, supportType: 'roller', dom: null },
+            { id: nextId++, type: 'load', x: 5, force: 5000, displayVal: 5000, displayUnit: 'N', dom: null }
+        ];
+        elements.forEach(createDOM);
+        updateScale();
+        recalc();
+    }
+
+    /**
+     * Handle unit system change — update all element display values
+     */
+    function onUnitChange() {
+        elements.forEach(function(el) {
+            if (el.type === 'load') {
+                el.displayUnit = getUnit();
+                el.displayVal = getUnit() === 'kg' ? (el.force / 9.81) : el.force;
+            } else if (el.type === 'udl' || el.type === 'uvl') {
+                var wN = el.type === 'udl' ? el.w : el.wPeak;
+                el.displayWUnit = getUnit();
+                el.displayW = getUnit() === 'kg' ? (wN / 9.81) : wN;
+            } else if (el.type === 'moment') {
+                el.displayUnit = getUnit();
+                el.displayVal = getUnit() === 'kg' ? (el.moment / 9.81) : el.moment;
+            }
+            updateDOM(el);
+        });
+        recalc();
+    }
+
+    /**
+     * Handle beam length input change — clamp all elements
+     */
+    function onBeamLengthChange() {
+        var L = getBeamLength();
+        lengthInput.value = L;
+        elements.forEach(function(el) {
+            if (el.type === 'udl' || el.type === 'uvl') {
+                el.x = clamp(el.x, 0, L);
+                el.span = clamp(el.span, 0.5, L - el.x);
+            } else {
+                el.x = clamp(el.x, 0, L);
+            }
+        });
+        updateAllDOM();
+        recalc();
+    }
+
+    /* ============================
+       DOM CREATION & UPDATE
+       ============================ */
+
+    /**
+     * Create DOM element for a beam element and append to beam box
+     * @param {Object} el - Element data object
+     */
+    function createDOM(el) {
+        var dom = document.createElement('div');
+        el.dom = dom;
+
+        if (el.type === 'support') {
+            dom.className = 'support ' + el.supportType;
+        } else if (el.type === 'load') {
+            dom.className = 'load-el';
+        } else if (el.type === 'udl') {
+            dom.className = 'udl-el';
+        } else if (el.type === 'uvl') {
+            dom.className = 'uvl-el';
+            // Build UVL visual: filled triangle area + lines
+            dom.innerHTML = '<div class="uvl-fill"></div><div class="uvl-left-line"></div><div class="uvl-right-line"></div><div class="uvl-right-hatch"></div>';
+        } else if (el.type === 'moment') {
+            dom.className = 'moment-el';
+            dom.innerHTML = '<div class="moment-circle"><div class="moment-arrow-' + el.direction + '"></div><div class="moment-tail-' + el.direction + '"></div></div>';
+        }
+
+        // Position label (always present)
+        var posLbl = document.createElement('div');
+        posLbl.className = 'pos-label';
+        dom.appendChild(posLbl);
+
+        // Value label (for non-support elements)
+        if (el.type !== 'support') {
+            var valLbl = document.createElement('div');
+            valLbl.className = 'el-label';
+            dom.appendChild(valLbl);
+            el.valLabel = valLbl;
+        }
+
+        // Mouse interaction
+        dom.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+            selectElement(el.id);
+            startDrag(e, el);
+        });
+        dom.addEventListener('touchstart', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            selectElement(el.id);
+            startDragTouch(e, el);
+        }, { passive: false });
+
+        boxEl.appendChild(dom);
+        updateDOM(el);
+    }
+
+    /**
+     * Update DOM position, labels, and selected state for an element
+     * @param {Object} el - Element data object
+     */
+    function updateDOM(el) {
+        if (!el.dom) return;
+        var L = getBeamLength();
+
+        if (el.type === 'udl') {
+            var pxL = mToPx(el.x);
+            var pxR = mToPx(Math.min(el.x + el.span, L));
+            var w = Math.max(4, pxR - pxL);
+            el.dom.style.left = pxL + 'px';
+            el.dom.style.width = w + 'px';
+            if (el.valLabel) {
+                el.valLabel.innerText = formatForceSmall(el.w, 'N/m');
+            }
+        } else if (el.type === 'uvl') {
+            var pxL2 = mToPx(el.x);
+            var pxR2 = mToPx(Math.min(el.x + el.span, L));
+            var w2 = Math.max(4, pxR2 - pxL2);
+            el.dom.style.left = pxL2 + 'px';
+            el.dom.style.width = w2 + 'px';
+            // Triangle fill height varies: 0 at left, full at right
+            var fill = el.dom.querySelector('.uvl-fill');
+            if (fill) {
+                fill.style.clipPath = 'polygon(0% 100%, 100% 0%, 100% 100%)';
+            }
+            if (el.valLabel) {
+                el.valLabel.innerText = formatForceSmall(el.wPeak, 'N/m') + ' (UVL)';
+            }
+        } else if (el.type === 'moment') {
+            var px3 = mToPx(el.x);
+            el.dom.style.left = (px3 - 14) + 'px';
+            if (el.valLabel) {
+                var arrow = el.direction === 'cw' ? '↻' : '↺';
+                el.valLabel.innerText = arrow + ' ' + formatMomentSmall(el.moment);
+            }
+        } else if (el.type === 'support') {
+            var px4 = mToPx(el.x);
+            if (el.supportType === 'fixed') {
+                el.dom.style.left = (px4 - 14) + 'px';
+            } else {
+                el.dom.style.left = (px4 - 14) + 'px';
+            }
+        } else if (el.type === 'load') {
+            var px5 = mToPx(el.x);
+            el.dom.style.left = (px5 - 1.5) + 'px';
+            if (el.valLabel) {
+                el.valLabel.innerText = formatForceSmall(el.force, 'N');
+            }
+        }
+
+        // Position label
+        var posLbl = el.dom.querySelector('.pos-label');
+        if (posLbl) {
+            posLbl.innerText = el.x.toFixed(1) + 'm';
+        }
+
+        // Selected state
+        if (el.id === selectedId) {
+            el.dom.classList.add('selected-el');
+        } else {
+            el.dom.classList.remove('selected-el');
+        }
+    }
+
+    /**
+     * Format a force value with current unit for labels
+     * @param {number} nVal - Value in N
+     * @param {string} suffix - Unit suffix string
+     * @returns {string} Formatted string
+     */
+    function formatForceSmall(nVal, suffix) {
+        if (getUnit() === 'kg') {
+            var kgVal = nVal / 9.81;
+            if (kgVal >= 1000) return (kgVal/1000).toFixed(1) + 'k kg/' + suffix.replace('N/','');
+            return kgVal.toFixed(1) + ' kg/' + suffix.replace('N/','');
+        }
+        if (nVal >= 1000) return (nVal/1000).toFixed(1) + 'k ' + suffix;
+        return nVal.toFixed(1) + ' ' + suffix;
+    }
+
+    /**
+     * Format a moment value with current unit for labels
+     * @param {number} nVal - Value in N·m
+     * @returns {string} Formatted string
+     */
+    function formatMomentSmall(nVal) {
+        if (getUnit() === 'kg') {
+            var kgVal = nVal / 9.81;
+            if (kgVal >= 1000) return (kgVal/1000).toFixed(1) + 'k kg·m';
+            return kgVal.toFixed(1) + ' kg·m';
+        }
+        if (nVal >= 1000) return (nVal/1000).toFixed(1) + 'k N·m';
+        return nVal.toFixed(1) + ' N·m';
+    }
+
+    /**
+     * Update all element DOM positions and the scale
+     */
+    function updateAllDOM() {
+        elements.forEach(updateDOM);
+        updateScale();
+    }
+
+    /* ============================
+       SCALE RULER
+       ============================ */
+
+    /**
+     * Draw tick marks and labels along the beam
+     */
+    function updateScale() {
+        var sc = document.getElementById('beamScale');
+        sc.innerHTML = '';
+        var L = getBeamLength();
+        var step = L <= 5 ? 0.5 : L <= 20 ? 1 : L <= 50 ? 2 : 5;
+        for (var m = 0; m <= L + 0.001; m += step) {
+            var isMajor = Math.abs(m - Math.round(m)) < 0.01;
+            var tick = document.createElement('div');
+            tick.className = 'tick ' + (isMajor ? 'major' : 'minor');
+            tick.style.left = (m / L * 100) + '%';
+            sc.appendChild(tick);
+            if (isMajor) {
+                var lbl = document.createElement('div');
+                lbl.className = 'tick-label';
+                lbl.style.left = (m / L * 100) + '%';
+                lbl.innerText = (m % 1 === 0 ? m : m.toFixed(1)) + 'm';
+                sc.appendChild(lbl);
+            }
+        }
+    }
+
+    /* ============================
+       DRAG & DROP
+       ============================ */
+
+    /**
+     * Start mouse drag on an element
+     * @param {MouseEvent} e - Mousedown event
+     * @param {Object} el - Element being dragged
+     */
+    function startDrag(e, el) {
+        var startX = e.clientX;
+        var startPx = mToPx(el.x);
+
+        function onMove(ev) {
+            var dx = ev.clientX - startX;
+            var newPx = startPx + dx;
+            if (el.type === 'support') newPx += 14;
+            if (el.type === 'load') newPx += 1.5;
+            if (el.type === 'moment') newPx += 14;
+            var snapped = snapToGrid(newPx);
+            el.x = snapped.m;
+            // Clamp UDL/UVL end within beam
+            if (el.type === 'udl' || el.type === 'uvl') {
+                el.span = clamp(el.span, 0.5, getBeamLength() - el.x);
+            }
+            updateDOM(el);
+            recalc();
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    /**
+     * Start touch drag on an element
+     * @param {TouchEvent} e - Touchstart event
+     * @param {Object} el - Element being dragged
+     */
+    function startDragTouch(e, el) {
+        var touch = e.touches[0];
+        var startX = touch.clientX;
+        var startPx = mToPx(el.x);
+
+        function onMove(ev) {
+            var t = ev.touches[0];
+            var dx = t.clientX - startX;
+            var newPx = startPx + dx;
+            if (el.type === 'support') newPx += 14;
+            if (el.type === 'load') newPx += 1.5;
+            if (el.type === 'moment') newPx += 14;
+            var snapped = snapToGrid(newPx);
+            el.x = snapped.m;
+            if (el.type === 'udl' || el.type === 'uvl') {
+                el.span = clamp(el.span, 0.5, getBeamLength() - el.x);
+            }
+            updateDOM(el);
+            recalc();
+        }
+        function onUp() {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onUp);
+        }
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+    }
+
+    /* ============================
+       SELECTION & EDIT PANEL
+       ============================ */
+
+    /**
+     * Select an element by ID
+     * @param {number} id - Element ID
+     */
+    function selectElement(id) {
+        selectedId = id;
+        updateAllDOM();
+    }
+
+    /**
+     * Open the edit panel for an element
+     * @param {number} id - Element ID
+     */
+    function openEdit(id) {
+        var el = elements.find(function(e) { return e.id === id; });
+        if (!el) return;
+        selectElement(id);
+
+        var panel = document.getElementById('editPanel');
+        var overlay = document.getElementById('editOverlay');
+        var content = document.getElementById('editContent');
+        var L = getBeamLength();
+        var html = '';
+
+        if (el.type === 'support') {
+            html = '<label>Position (m)</label>' +
+                '<input type="number" id="editPos" value="' + el.x.toFixed(1) + '" step="0.5" min="0" max="' + L + '">' +
+                '<label>Support Type</label>' +
+                '<select id="editSupType">' +
+                '<option value="pin"' + (el.supportType==='pin'?' selected':'') + '>Pin (Vertical reaction only)</option>' +
+                '<option value="roller"' + (el.supportType==='roller'?' selected':'') + '>Roller (Vertical reaction only)</option>' +
+                '<option value="fixed"' + (el.supportType==='fixed'?' selected':'') + '>Fixed (Vertical + Moment)</option>' +
+                '</select>' +
+                '<button class="btn-sup" onclick="BeamApp.applyEdit(' + el.id + ')">Apply Changes</button>' +
+                '<button class="btn-del" onclick="BeamApp.closeEdit();BeamApp.deleteSelected();">Delete This Support</button>';
+        } else if (el.type === 'load') {
+            html = '<label>Position (m)</label>' +
+                '<input type="number" id="editPos" value="' + el.x.toFixed(1) + '" step="0.5" min="0" max="' + L + '">' +
+                '<label>Load Value</label>' +
+                '<input type="number" id="editForceVal" value="' + el.displayVal.toFixed(2) + '" step="1" min="0">' +
+                '<label>Unit</label>' +
+                '<select id="editForceUnit">' +
+                '<option value="N"' + (el.displayUnit==='N'?' selected':'') + '>N</option>' +
+                '<option value="kg"' + (el.displayUnit==='kg'?' selected':'') + '>kg</option>' +
+                '</select>' +
+                '<button class="btn-load" onclick="BeamApp.applyEdit(' + el.id + ')">Apply Changes</button>' +
+                '<button class="btn-del" onclick="BeamApp.closeEdit();BeamApp.deleteSelected();">Delete This Load</button>';
+        } else if (el.type === 'udl') {
+            html = '<label>Start Position (m)</label>' +
+                '<input type="number" id="editPos" value="' + el.x.toFixed(1) + '" step="0.5" min="0" max="' + L + '">' +
+                '<label>Intensity</label>' +
+                '<input type="number" id="editW" value="' + el.displayW.toFixed(2) + '" step="10" min="0">' +
+                '<label>Unit</label>' +
+                '<select id="editWUnit">' +
+                '<option value="N"' + (el.displayWUnit==='N'?' selected':'') + '>N/m</option>' +
+                '<option value="kg"' + (el.displayWUnit==='kg'?' selected':'') + '>kg/m</option>' +
+                '</select>' +
+                '<label>Span Length (m)</label>' +
+                '<input type="number" id="editSpan" value="' + el.span.toFixed(1) + '" step="0.5" min="0.5" max="' + L + '">' +
+                '<button class="btn-udl" onclick="BeamApp.applyEdit(' + el.id + ')">Apply Changes</button>' +
+                '<button class="btn-del" onclick="BeamApp.closeEdit();BeamApp.deleteSelected();">Delete This UDL</button>';
+        } else if (el.type === 'uvl') {
+            html = '<label>Start Position (m)</label>' +
+                '<input type="number" id="editPos" value="' + el.x.toFixed(1) + '" step="0.5" min="0" max="' + L + '">' +
+                '<label>Peak Intensity (at end)</label>' +
+                '<input type="number" id="editW" value="' + el.displayW.toFixed(2) + '" step="10" min="0">' +
+                '<label>Unit</label>' +
+                '<select id="editWUnit">' +
+                '<option value="N"' + (el.displayWUnit==='N'?' selected':'') + '>N/m</option>' +
+                '<option value="kg"' + (el.displayWUnit==='kg'?' selected':'') + '>kg/m</option>' +
+                '</select>' +
+                '<label>Span Length (m)</label>' +
+                '<input type="number" id="editSpan" value="' + el.span.toFixed(1) + '" step="0.5" min="0.5" max="' + L + '">' +
+                '<button class="btn-uvl" onclick="BeamApp.applyEdit(' + el.id + ')">Apply Changes</button>' +
+                '<button class="btn-del" onclick="BeamApp.closeEdit();BeamApp.deleteSelected();">Delete This UVL</button>';
+        } else if (el.type === 'moment') {
+            html = '<label>Position (m)</label>' +
+                '<input type="number" id="editPos" value="' + el.x.toFixed(1) + '" step="0.5" min="0" max="' + L + '">' +
+                '<label>Moment Value</label>' +
+                '<input type="number" id="editMomentVal" value="' + el.displayVal.toFixed(2) + '" step="1" min="0">' +
+                '<label>Unit</label>' +
+                '<select id="editMomentUnit">' +
+                '<option value="N"' + (el.displayUnit==='N'?' selected':'') + '>N·m</option>' +
+                '<option value="kg"' + (el.displayUnit==='kg'?' selected':'') + '>kg·m</option>' +
+                '</select>' +
+                '<label>Direction</label>' +
+                '<select id="editMomentDir">' +
+                '<option value="cw"' + (el.direction==='cw'?' selected':'') + '>Clockwise (↻)</option>' +
+                '<option value="ccw"' + (el.direction==='ccw'?' selected':'') + '>Counter-clockwise (↺)</option>' +
+                '</select>' +
+                '<button class="btn-moment" onclick="BeamApp.applyEdit(' + el.id + ')">Apply Changes</button>' +
+                '<button class="btn-del" onclick="BeamApp.closeEdit();BeamApp.deleteSelected();">Delete This Moment</button>';
+        }
+
+        content.innerHTML = html;
+        panel.classList.add('open');
+        overlay.classList.add('open');
+    }
+
+    /**
+     * Apply edits from the edit panel to an element
+     * @param {number} id - Element ID
+     */
+    function applyEdit(id) {
+        var el = elements.find(function(e) { return e.id === id; });
+        if (!el) return;
+        var L = getBeamLength();
+
+        if (el.type === 'support') {
+            el.x = clamp(parseFloat(document.getElementById('editPos').value) || 0, 0, L);
+            el.supportType = document.getElementById('editSupType').value;
+            el.dom.className = 'support ' + el.supportType;
+        } else if (el.type === 'load') {
+            el.x = clamp(parseFloat(document.getElementById('editPos').value) || 0, 0, L);
+            var val = parseFloat(document.getElementById('editForceVal').value) || 0;
+            var unit = document.getElementById('editForceUnit').value;
+            el.displayVal = Math.abs(val);
+            el.displayUnit = unit;
+            el.force = unit === 'kg' ? Math.abs(val) * 9.81 : Math.abs(val);
+        } else if (el.type === 'udl') {
+            el.x = clamp(parseFloat(document.getElementById('editPos').value) || 0, 0, L);
+            var wVal = parseFloat(document.getElementById('editW').value) || 0;
+            var wUnit = document.getElementById('editWUnit').value;
+            el.displayW = Math.abs(wVal);
+            el.displayWUnit = wUnit;
+            el.w = wUnit === 'kg' ? Math.abs(wVal) * 9.81 : Math.abs(wVal);
+            el.span = clamp(parseFloat(document.getElementById('editSpan').value) || 0.5, 0.5, L - el.x);
+        } else if (el.type === 'uvl') {
+            el.x = clamp(parseFloat(document.getElementById('editPos').value) || 0, 0, L);
+            var wVal2 = parseFloat(document.getElementById('editW').value) || 0;
+            var wUnit2 = document.getElementById('editWUnit').value;
+            el.displayW = Math.abs(wVal2);
+            el.displayWUnit = wUnit2;
+            el.wPeak = wUnit2 === 'kg' ? Math.abs(wVal2) * 9.81 : Math.abs(wVal2);
+            el.span = clamp(parseFloat(document.getElementById('editSpan').value) || 0.5, 0.5, L - el.x);
+        } else if (el.type === 'moment') {
+            el.x = clamp(parseFloat(document.getElementById('editPos').value) || 0, 0, L);
+            var mVal = parseFloat(document.getElementById('editMomentVal').value) || 0;
+            var mUnit = document.getElementById('editMomentUnit').value;
+            el.displayVal = Math.abs(mVal);
+            el.displayUnit = mUnit;
+            el.moment = mUnit === 'kg' ? Math.abs(mVal) * 9.81 : Math.abs(mVal);
+            el.direction = document.getElementById('editMomentDir').value;
+            // Rebuild DOM visual for moment direction change
+            el.dom.innerHTML = '<div class="moment-circle"><div class="moment-arrow-' + el.direction + '"></div><div class="moment-tail-' + el.direction + '"></div></div>';
+            var posLbl = document.createElement('div');
+            posLbl.className = 'pos-label';
+            el.dom.appendChild(posLbl);
+            var valLbl = document.createElement('div');
+            valLbl.className = 'el-label';
+            el.dom.appendChild(valLbl);
+            el.valLabel = valLbl;
+        }
+
+        updateDOM(el);
+        closeEdit();
+        recalc();
+    }
+
+    /**
+     * Close the edit panel
+     */
+    function closeEdit() {
+        document.getElementById('editPanel').classList.remove('open');
+        document.getElementById('editOverlay').classList.remove('open');
+    }
+
+    /* ============================
+       STRUCTURAL CALCULATION ENGINE
+       ============================ */
+
+    /**
+     * Compute applied shear and moment at position x from all loads (excluding reactions)
+     * @param {number} x - Position along beam
+     * @param {number} L - Beam length
+     * @returns {{V: number, M: number}} Applied shear and moment at x
+     */
+    function computeApplied(x, L) {
+        var V = 0, M = 0;
+        for (var i = 0; i < elements.length; i++) {
+            var el = elements[i];
+            if (el.type === 'load') {
+                // Point load: downward force
+                if (x >= el.x - 1e-9) {
+                    V -= el.force;
+                    M -= el.force * (x - el.x);
+                }
+            } else if (el.type === 'udl') {
+                // UDL: constant intensity w over [x1, x2]
+                var x1 = clamp(el.x, 0, L);
+                var x2 = clamp(el.x + el.span, 0, L);
+                if (x > x1 + 1e-9) {
+                    var a = x1;
+                    var b = Math.min(x, x2);
+                    var len = b - a;
+                    V -= el.w * len;
+                    M -= el.w * (x - a) * len - el.w * len * len / 2;
+                }
+            } else if (el.type === 'uvl') {
+                // UVL: linearly varying from 0 at x1 to wPeak at x2
+                var ux1 = clamp(el.x, 0, L);
+                var ux2 = clamp(el.x + el.span, 0, L);
+                if (x > ux1 + 1e-9) {
+                    var ua = ux1;
+                    var ub = Math.min(x, ux2);
+                    var uLen = ub - ua;
+                    var span = ux2 - ux1;
+                    // Intensity at position t: w(t) = wPeak * (t - ux1) / span
+                    // Shear: integral of w(t) dt from ua to ub
+                    // = wPeak/span * [ (ub-ux1)^2/2 - (ua-ux1)^2/2 ]
+                    var Vint = (el.wPeak / Math.max(1e-9, span)) * (Math.pow(ub - ux1, 2) / 2 - Math.pow(ua - ux1, 2) / 2);
+                    V -= Vint;
+                    // Moment: integral of w(t)*(x-t) dt from ua to ub
+                    var Mint = (el.wPeak / Math.max(1e-9, span)) * (
+                        x * (Math.pow(ub - ux1, 2) / 2 - Math.pow(ua - ux1, 2) / 2) -
+                        (Math.pow(ub - ux1, 3) / 3 - Math.pow(ua - ux1, 3) / 3)
+                    );
+                    M -= Mint;
+                }
+            } else if (el.type === 'moment') {
+                // Applied moment: CW positive, adds to M at all points after it
+                if (x >= el.x - 1e-9) {
+                    M += el.direction === 'cw' ? el.moment : -el.moment;
+                }
+            }
+        }
+        return { V: V, M: M };
+    }
+
+    /**
+     * Solve a linear system Ax = b using Gaussian elimination with partial pivoting
+     * @param {number[][]} A - Coefficient matrix (n x n)
+     * @param {number[]} b - Right-hand side vector (n)
+     * @param {number} n - System size
+     * @returns {number[]} Solution vector x
+     */
+    function solveLinearSystem(A, b, n) {
+        // Create augmented matrix
+        var aug = [];
+        for (var i = 0; i < n; i++) {
+            aug.push(A[i].slice().concat([b[i]]));
+        }
+        // Forward elimination with partial pivoting
+        for (var col = 0; col < n; col++) {
+            var maxRow = col;
+            for (var row = col + 1; row < n; row++) {
+                if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) maxRow = row;
+            }
+            var tmp = aug[col]; aug[col] = aug[maxRow]; aug[maxRow] = tmp;
+            if (Math.abs(aug[col][col]) < 1e-12) continue;
+            for (var row2 = col + 1; row2 < n; row2++) {
+                var factor = aug[row2][col] / aug[col][col];
+                for (var j = col; j <= n; j++) {
+                    aug[row2][j] -= factor * aug[col][j];
+                }
+            }
+        }
+        // Back substitution
+        var x = new Array(n).fill(0);
+        for (var i2 = n - 1; i2 >= 0; i2--) {
+            if (Math.abs(aug[i2][i2]) < 1e-12) continue;
+            x[i2] = aug[i2][n];
+            for (var j2 = i2 + 1; j2 < n; j2++) {
+                x[i2] -= aug[i2][j2] * x[j2];
+            }
+            x[i2] /= aug[i2][i2];
+        }
+        return x;
+    }
+
+    /**
+     * Compute reaction forces for all supports
+     * Handles: 0-2 supports (determinate), 3+ supports (indeterminate, approximate)
+     * Fixed supports provide both vertical reaction and reaction moment
+     * @returns {Object|null} Reaction data or null if no supports
+     */
+    function getReactionForces() {
+        var L = getBeamLength();
+        var supports = elements.filter(function(e) { return e.type === 'support'; });
+        var n = supports.length;
+        if (n < 1) return null;
+
+        // Separate pin/roller supports from fixed supports
+        var vertSupports = [];  // indices in supports array that are pin or roller
+        var fixedSupports = []; // indices that are fixed
+        for (var i = 0; i < n; i++) {
+            if (supports[i].supportType === 'fixed') {
+                fixedSupports.push(i);
+            } else {
+                vertSupports.push(i);
+            }
+        }
+        var nv = vertSupports.length;  // number of vertical-only supports
+        var nf = fixedSupports.length;  // number of fixed supports
+
+        // Total unknowns: nv vertical reactions + nf*2 (vertical + moment) = nv + 2*nf
+        var totalUnknowns = nv + 2 * nf;
+
+        if (totalUnknowns === 0) return null;
+
+        // Build equations: A * R = b
+        // R vector: [R_vert[0], R_vert[1], ..., R_fixed[0]_vert, R_fixed[0]_mom, R_fixed[1]_vert, R_fixed[1]_mom, ...]
+        // Map from R index to (supportIndex, type) where type is 'V' or 'M'
+        var rMap = []; // array of {si: supportIndex, type: 'V'|'M'}
+        vertSupports.forEach(function(si) { rMap.push({ si: si, type: 'V' }); });
+        fixedSupports.forEach(function(si) {
+            rMap.push({ si: si, type: 'V' });
+            rMap.push({ si: si, type: 'M' });
+        });
+
+        var nu = rMap.length; // total unknowns
+
+        // Helper: compute total reaction contribution to V and M at position x
+        // Rv = array of vertical reaction values (indexed by support index)
+        // Rm = array of moment reaction values (indexed by support index, 0 for non-fixed)
+        function reactionVM(x, Rv, Rm) {
+            var V = 0, M = 0;
+            for (var i = 0; i < n; i++) {
+                if (x >= supports[i].x - 1e-9) {
+                    V += Rv[i];
+                    M += Rv[i] * (x - supports[i].x);
+                    if (supports[i].supportType === 'fixed') {
+                        M += Rm[i];
+                    }
+                }
+            }
+            return { V: V, M: M };
+        }
+
+        if (nu === 1 && nf === 1 && nv === 0) {
+            // Single fixed support (cantilever)
+            // Eq1: V(L) = 0 => Rv + V_app(L) = 0
+            // Eq2: M(L) = 0 => Rv*(L-xs) + Rm + M_app(L) = 0
+            var appL = computeApplied(L, L);
+            var Rv_arr = new Array(n).fill(0);
+            var Rm_arr = new Array(n).fill(0);
+            Rv_arr[0] = -appL.V;
+            Rm_arr[0] = -appL.M - Rv_arr[0] * (L - supports[0].x);
+            var R_full = new Array(nu).fill(0);
+            R_full[0] = Rv_arr[0]; // V
+            R_full[1] = Rm_arr[0]; // M
+            return { supports: supports, R: R_full, Rv: Rv_arr, Rm: Rm_arr, rMap: rMap, n: n, indeterminate: false };
+        }
+
+        if (nu === 2 && nf === 0) {
+            // Two pin/roller supports — statically determinate
+            var x0 = supports[vertSupports[0]].x;
+            var x1 = supports[vertSupports[1]].x;
+            var R0, R1;
+
+            if (Math.abs(x1 - x0) < 1e-9) {
+                // Co-located supports — treat as single
+                R0 = -computeApplied(L, L).V / 2;
+                R1 = R0;
+            } else {
+                // Use moment equilibrium about the farther support from each end
+                // Find which support is more to the left
+                var leftIdx = vertSupports[0];
+                var rightIdx = vertSupports[1];
+                if (supports[leftIdx].x > supports[rightIdx].x) {
+                    leftIdx = vertSupports[1];
+                    rightIdx = vertSupports[0];
+                }
+                var xL = supports[leftIdx].x;
+                var xR = supports[rightIdx].x;
+
+                // Take moments about right support
+                var appR = computeApplied(xR, L);
+                // M_about_right = 0: R_left*(xR-xL) + M_app(xR) = 0
+                R0 = -appR.M / Math.max(1e-9, xR - xL);
+
+                // Take moments about left support
+                var appL2 = computeApplied(xL, L);
+                // M_about_left = 0: R_right*(xL-xR) + M_app(xL) = 0
+                R1 = -appL2.M / Math.max(1e-9, xL - xR);
+
+                // Assign correctly
+                var Rv_arr2 = new Array(n).fill(0);
+                Rv_arr2[vertSupports[0]] = R0;
+                Rv_arr2[vertSupports[1]] = R1;
+                var Rm_arr2 = new Array(n).fill(0);
+                var R_full2 = new Array(nu).fill(0);
+                R_full2[0] = R0;
+                R_full2[1] = R1;
+                return { supports: supports, R: R_full2, Rv: Rv_arr2, Rm: Rm_arr2, rMap: rMap, n: n, indeterminate: false };
+            }
+        }
+
+        // General case: build system of equations
+        // Equations:
+        // 1. Sum of vertical forces = 0
+        // 2. Sum of moments about x=0 = 0
+        // 3. M = 0 at each pin/roller support position (if applicable)
+        // 4. For fixed supports: no additional M=0 condition (moment is unknown)
+        var equations = [];
+        var rhs = [];
+
+        // Eq: Sum Fy = 0
+        {
+            var row = new Array(nu).fill(0);
+            for (var k = 0; k < nu; k++) {
+                if (rMap[k].type === 'V') row[k] = 1;
+            }
+            var appSumF = computeApplied(L, L);
+            equations.push(row);
+            rhs.push(-appSumF.V);
+        }
+
+        // Eq: Sum M about x=0 = 0
+        {
+            var row2 = new Array(nu).fill(0);
+            for (var k2 = 0; k2 < nu; k2++) {
+                if (rMap[k2].type === 'V') {
+                    row2[k2] = supports[rMap[k2].si].x;
+                } else {
+                    row2[k2] = 1; // moment reaction
+                }
+            }
+            var appSumM = computeApplied(0, L);
+            equations.push(row2);
+            rhs.push(-appSumM.M);
+        }
+
+        // Eq: M = 0 at each pin/roller support (where moment is NOT a reaction)
+        vertSupports.forEach(function(si) {
+            var sx = supports[si].x;
+            var row3 = new Array(nu).fill(0);
+            for (var k3 = 0; k3 < nu; k3++) {
+                if (rMap[k3].type === 'V' && sx >= supports[rMap[k3].si].x - 1e-9) {
+                    row3[k3] = sx - supports[rMap[k3].si].x;
+                } else if (rMap[k3].type === 'M' && sx >= supports[rMap[k3].si].x - 1e-9) {
+                    row3[k3] = 1;
+                }
+            }
+            var app3 = computeApplied(sx, L);
+            equations.push(row3);
+            rhs.push(-app3.M);
+        });
+
+        // Eq: M = 0 at beam ends (if no support there)
+        var supPositions = supports.map(function(s) { return s.x; });
+        if (supPositions.indexOf(0) === -1) {
+            var row4 = new Array(nu).fill(0);
+            // At x=0, no reaction contributes (all at x>0), M_app(0) should be 0
+            // This gives 0=0 unless there's a moment at x=0
+            // Only add if there's an applied moment at x=0
+            var hasMomentAt0 = elements.some(function(e) { return e.type === 'moment' && Math.abs(e.x) < 1e-9; });
+            if (hasMomentAt0) {
+                var app0 = computeApplied(0, L);
+                equations.push(row4);
+                rhs.push(-app0.M);
+            }
+        }
+        if (supPositions.indexOf(L) === -1) {
+            var row5 = new Array(nu).fill(0);
+            for (var k5 = 0; k5 < nu; k5++) {
+                if (rMap[k5].type === 'V' && L >= supports[rMap[k5].si].x - 1e-9) {
+                    row5[k5] = L - supports[rMap[k5].si].x;
+                } else if (rMap[k5].type === 'M' && L >= supports[rMap[k5].si].x - 1e-9) {
+                    row5[k5] = 1;
+                }
+            }
+            var appEnd = computeApplied(L, L);
+            equations.push(row5);
+            rhs.push(-appEnd.M);
+        }
+
+        // Solve system (may be over or under determined)
+        var numEq = equations.length;
+        var isIndeterminate = numEq < nu;
+
+        if (numEq < nu) {
+            // Add regularization: minimize sum of squares of reactions
+            for (var ri = 0; ri < nu; ri++) {
+                var regRow = new Array(nu).fill(0);
+                regRow[ri] = 0.01; // small regularization
+                equations.push(regRow);
+                rhs.push(0);
+            }
+            numEq = equations.length;
+        }
+
+        // Solve via least squares: (A^T A) x = A^T b
+        var ATA = [];
+        var ATb = [];
+        for (var ii = 0; ii < nu; ii++) {
+            ATA.push(new Array(nu).fill(0));
+            ATb.push(0);
+        }
+        for (var ei = 0; ei < numEq; ei++) {
+            for (var jj = 0; jj < nu; jj++) {
+                for (var kk = 0; kk < nu; kk++) {
+                    ATA[jj][kk] += equations[ei][jj] * equations[ei][kk];
+                }
+                ATb[jj] += equations[ei][jj] * rhs[ei];
+            }
+        }
+
+        var R_solve = solveLinearSystem(ATA, ATb, nu);
+
+        // Extract Rv and Rm arrays
+        var Rv_final = new Array(n).fill(0);
+        var Rm_final = new Array(n).fill(0);
+        for (var mi = 0; mi < nu; mi++) {
+            if (rMap[mi].type === 'V') {
+                Rv_final[rMap[mi].si] = R_solve[mi];
+            } else {
+                Rm_final[rMap[mi].si] = R_solve[mi];
+            }
+        }
+
+        return {
+            supports: supports,
+            R: R_solve,
+            Rv: Rv_final,
+            Rm: Rm_final,
+            rMap: rMap,
+            n: n,
+            indeterminate: isIndeterminate
+        };
+    }
+
+    /* ============================
+       SFD/BMD COMPUTATION
+       ============================ */
+
+    /**
+     * Compute SFD and BMD arrays with high precision
+     * Uses piecewise linear SFD and correct parabolic segments for BMD under UVL
+     * @param {Object|null} reactionData - From getReactionForces()
+     * @returns {Object|null} Diagram data arrays and key values, or null
+     */
+    function computeDiagrams(reactionData) {
+        if (!reactionData) return null;
+        var L = getBeamLength();
+        var supports = reactionData.supports;
+        var Rv = reactionData.Rv;
+        var Rm = reactionData.Rm;
+
+        // High resolution: 500 points for accuracy
+        var N = 500;
+        var xArr = [], vArr = [], mArr = [];
+
+        for (var i = 0; i <= N; i++) {
+            var pos = (i / N) * L;
+            // Start with applied loads
+            var vm = computeApplied(pos, L);
+            var V = vm.V;
+            var M = vm.M;
+
+            // Add reaction contributions
+            for (var j = 0; j < supports.length; j++) {
+                if (pos >= supports[j].x - 1e-9) {
+                    V += Rv[j];
+                    M += Rv[j] * (pos - supports[j].x);
+                    if (supports[j].supportType === 'fixed') {
+                        M += Rm[j];
+                    }
+                }
+            }
+
+            xArr.push(parseFloat(pos.toFixed(4)));
+            vArr.push(V);
+            mArr.push(M);
+        }
+
+        // Find key points (max/min values)
+        var maxV = -Infinity, minV = Infinity, maxM = -Infinity, minM = Infinity;
+        var maxVx = 0, minVx = 0, maxMx = 0, minMx = 0;
+        var zeroShearPoints = [];
+
+        for (var i2 = 0; i2 < vArr.length; i2++) {
+            if (vArr[i2] > maxV) { maxV = vArr[i2]; maxVx = xArr[i2]; }
+            if (vArr[i2] < minV) { minV = vArr[i2]; minVx = xArr[i2]; }
+            if (mArr[i2] > maxM) { maxM = mArr[i2]; maxMx = xArr[i2]; }
+            if (mArr[i2] < minM) { minM = mArr[i2]; minMx = xArr[i2]; }
+
+            // Detect zero shear crossings (linear interpolation)
+            if (i2 > 0 && vArr[i2 - 1] * vArr[i2] < 0) {
+                var t = vArr[i2 - 1] / (vArr[i2 - 1] - vArr[i2]);
+                var zs = xArr[i2 - 1] + t * (xArr[i2] - xArr[i2 - 1]);
+                zeroShearPoints.push(parseFloat(zs.toFixed(3)));
+            }
+            // Exact zero
+            if (Math.abs(vArr[i2]) < 0.05) {
+                var dup = zeroShearPoints.some(function(z) { return Math.abs(z - xArr[i2]) < L / N * 3; });
+                if (!dup) zeroShearPoints.push(xArr[i2]);
+            }
+        }
+
+        var absMaxV = Math.max(Math.abs(maxV), Math.abs(minV));
+        var absMaxM = Math.max(Math.abs(maxM), Math.abs(minM));
+
+        // Build reaction info for display
+        var reactionInfo = [];
+        for (var ri = 0; ri < supports.length; ri++) {
+            var label = 'R' + (ri + 1);
+            if (supports[ri].supportType === 'fixed') label = 'R' + (ri + 1) + ' (fixed)';
+            reactionInfo.push({
+                x: supports[ri].x,
+                Rv: Rv[ri],
+                Rm: Rm[ri] || 0,
+                label: label,
+                type: supports[ri].supportType
+            });
+        }
+
+        return {
+            x: xArr, V: vArr, M: mArr,
+            maxV: maxV, minV: minV,
+            maxM: maxM, minM: minM,
+            absMaxV: absMaxV, absMaxM: absMaxM,
+            maxVx: maxVx, minVx: minVx,
+            maxMx: maxMx, minMx: minMx,
+            zeroShearPoints: zeroShearPoints,
+            reactions: reactionInfo
+        };
+    }
+
+    /* ============================
+       MAIN RECALCULATE FUNCTION
+       ============================ */
+
+    /**
+     * Main recalculation: compute reactions, diagrams, update UI and charts
+     */
+    function recalc() {
+        if (!chartsReady) return;
+        var L = getBeamLength();
+        var supports = elements.filter(function(e) { return e.type === 'support'; });
+        var loads = elements.filter(function(e) { return e.type === 'load' || e.type === 'udl' || e.type === 'uvl' || e.type === 'moment'; });
+
+        // Warning messages
+        warnEl.className = '';
+        if (supports.length === 0) {
+            warnEl.className = 'show warn-red';
+            warnEl.innerHTML = '&#9888; Add at least one support to calculate reactions.';
+            infoEl.innerHTML = '';
+            clearCharts();
+            return;
+        }
+        if (supports.length > 2) {
+            warnEl.className = 'show warn-yellow';
+            warnEl.innerHTML = '&#9888; Statically indeterminate beam (' + supports.length + ' supports) — results are approximate.';
+        } else if (loads.length === 0) {
+            warnEl.className = 'show warn-blue';
+            warnEl.innerHTML = '&#9432; Add loads (point load, UDL, UVL, or moment) to see diagrams.';
+        } else {
+            warnEl.style.display = 'none';
+            warnEl.className = '';
+        }
+
+        // Calculate reactions
+        var reactionData = getReactionForces();
+        var diag = computeDiagrams(reactionData);
+
+        if (!diag) { infoEl.innerHTML = ''; clearCharts(); return; }
+
+        // Build info cards HTML
+        var html = '';
+        diag.reactions.forEach(function(r, idx) {
+            var cls = idx === 0 ? 'val-ra' : idx === 1 ? 'val-rb' : 'val-rm';
+            var dir = r.Rv >= 0 ? '&#8593;' : '&#8595;';
+            html += '<div class="info-card"><div class="lbl">' + r.label + ' at ' + r.x.toFixed(1) + 'm</div>' +
+                '<div class="val ' + cls + '">' + dir + ' ' + formatForceN(r.Rv) +
+                '<br><span class="val-sub">(' + (r.Rv >= 0 ? '+' : '') + r.Rv.toFixed(2) + ' N)</span></div></div>';
+            if (r.type === 'fixed' && Math.abs(r.Rm) > 0.01) {
+                var mDir = r.Rm >= 0 ? 'CCW' : 'CW';
+                html += '<div class="info-card"><div class="lbl">' + r.label + ' Moment</div>' +
+                    '<div class="val ' + cls + '">' + mDir + ' ' + formatMomentN(r.Rm) +
+                    '<br><span class="val-sub">(' + r.Rm.toFixed(2) + ' N·m)</span></div></div>';
+            }
+        });
+
+        html += '<div class="info-card"><div class="lbl">Max Shear Force (absolute)</div>' +
+            '<div class="val val-vmax">' + formatForceN(diag.absMaxV) +
+            '<br><span class="val-sub">(' + diag.absMaxV.toFixed(2) + ' N)</span></div></div>';
+
+        html += '<div class="info-card"><div class="lbl">Max Bending Moment (absolute)</div>' +
+            '<div class="val val-mmax">' + formatMomentN(diag.absMaxM) +
+            '<br><span class="val-sub">(' + diag.absMaxM.toFixed(2) + ' N·m)</span></div></div>';
+
+        // Show sagging/hogging info
+        html += '<div class="info-card"><div class="lbl">Sagging (+) / Hogging (&minus;)</div>' +
+            '<div class="val val-zs">+ ' + formatMomentN(diag.maxM) + ' / &minus; ' + formatMomentN(Math.abs(diag.minM)) + '</div></div>';
+
+        if (diag.zeroShearPoints.length > 0) {
+            html += '<div class="info-card"><div class="lbl">Zero Shear Points</div>' +
+                '<div class="val val-zs">' + diag.zeroShearPoints.map(function(p) { return p.toFixed(2) + 'm'; }).join(', ') + '</div></div>';
+        }
+
+        infoEl.innerHTML = html;
+        drawCharts(diag, L);
+    }
+
+    /**
+     * Format moment with dual units for info cards
+     * @param {number} nVal - Value in N·m
+     * @returns {string} Formatted string
+     */
+    function formatMomentN(nVal) {
+        if (getUnit() === 'kg') {
+            return (nVal / 9.81).toFixed(2) + ' kg·m';
+        }
+        if (Math.abs(nVal) >= 1000) return (nVal / 1000).toFixed(2) + ' kN·m';
+        return nVal.toFixed(2) + ' N·m';
+    }
+
+    /* ============================
+       CHART DRAWING
+       ============================ */
+
+    /**
+     * Destroy existing chart instances
+     */
+    function clearCharts() {
+        if (sfdChart) { sfdChart.destroy(); sfdChart = null; }
+        if (bmdChart) { bmdChart.destroy(); bmdChart = null; }
+    }
+
+    /**
+     * Draw SFD and BMD charts using Chart.js
+     * SFD: piecewise linear (tension: 0)
+     * BMD: correct curvature with tension for smoothness under distributed loads
+     * @param {Object} diag - Diagram data from computeDiagrams
+     * @param {number} L - Beam length
+     */
+    function drawCharts(diag, L) {
+        var supports = elements.filter(function(e) { return e.type === 'support'; });
+        var loads = elements.filter(function(e) { return e.type === 'load'; });
+        var udls = elements.filter(function(e) { return e.type === 'udl'; });
+        var uvls = elements.filter(function(e) { return e.type === 'uvl'; });
+        var moments = elements.filter(function(e) { return e.type === 'moment'; });
+
+        // Build annotation objects
+        var anno = {};
+
+        // Support position lines
+        supports.forEach(function(s, i) {
+            anno['sup' + i] = {
+                type: 'line', xMin: s.x, xMax: s.x,
+                borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, borderDash: [4, 4],
+                label: {
+                    display: true, content: s.supportType === 'fixed' ? 'Fixed' : ('R' + (i + 1)),
+                    position: 'start', backgroundColor: 'rgba(37,99,235,0.85)',
+                    color: '#fff', font: { size: 9, weight: 'bold' }, padding: 3, borderRadius: 4
+                }
+            };
+        });
+
+        // Zero line
+        anno['zero'] = { type: 'line', yMin: 0, yMax: 0, borderColor: 'rgba(148,163,184,0.35)', borderWidth: 1 };
+
+        // Load markers
+        loads.forEach(function(l, i) {
+            anno['load' + i] = {
+                type: 'line', xMin: l.x, xMax: l.x,
+                borderColor: 'rgba(248,113,113,0.3)', borderWidth: 1.5, borderDash: [3, 3]
+            };
+        });
+
+        // UDL shaded regions
+        udls.forEach(function(u, i) {
+            anno['udl' + i] = {
+                type: 'box', xMin: u.x, xMax: u.x + u.span,
+                backgroundColor: 'rgba(251,146,60,0.06)', borderColor: 'rgba(251,146,60,0.15)', borderWidth: 1
+            };
+        });
+
+        // UVL shaded regions
+        uvls.forEach(function(u, i) {
+            anno['uvl' + i] = {
+                type: 'box', xMin: u.x, xMax: u.x + u.span,
+                backgroundColor: 'rgba(8,145,178,0.06)', borderColor: 'rgba(8,145,178,0.15)', borderWidth: 1
+            };
+        });
+
+        // Moment markers
+        moments.forEach(function(m, i) {
+            anno['mom' + i] = {
+                type: 'line', xMin: m.x, xMax: m.x,
+                borderColor: 'rgba(124,58,237,0.4)', borderWidth: 2, borderDash: [5, 3]
+            };
+        });
+
+        // Max/min point annotations
+        var sfdAnno = Object.assign({}, anno);
+        sfdAnno['maxV'] = {
+            type: 'point', xValue: diag.maxVx, yValue: diag.maxV,
+            backgroundColor: '#f87171', borderColor: '#fff', borderWidth: 2, radius: 5,
+            label: { display: true, content: 'Max: ' + formatForceN(diag.maxV), position: 'end',
+                backgroundColor: 'rgba(127,29,29,0.9)', color: '#fca5a5', font: { size: 10, weight: 'bold' }, padding: 4, borderRadius: 4 }
+        };
+        if (Math.abs(diag.minV) > 0.1) {
+            sfdAnno['minV'] = {
+                type: 'point', xValue: diag.minVx, yValue: diag.minV,
+                backgroundColor: '#fb923c', borderColor: '#fff', borderWidth: 2, radius: 5,
+                label: { display: true, content: 'Min: ' + formatForceN(diag.minV), position: 'start',
+                    backgroundColor: 'rgba(124,45,18,0.9)', color: '#fed7aa', font: { size: 10, weight: 'bold' }, padding: 4, borderRadius: 4 }
+            };
+        }
+
+        var bmdAnno = Object.assign({}, anno);
+        bmdAnno['maxM'] = {
+            type: 'point', xValue: diag.maxMx, yValue: diag.maxM,
+            backgroundColor: '#34d399', borderColor: '#fff', borderWidth: 2, radius: 5,
+            label: { display: true, content: 'Sag: ' + formatMomentN(diag.maxM), position: 'end',
+                backgroundColor: 'rgba(6,78,59,0.9)', color: '#6ee7b7', font: { size: 10, weight: 'bold' }, padding: 4, borderRadius: 4 }
+        };
+        if (diag.minM < -0.1) {
+            bmdAnno['minM'] = {
+                type: 'point', xValue: diag.minMx, yValue: diag.minM,
+                backgroundColor: '#f472b6', borderColor: '#fff', borderWidth: 2, radius: 5,
+                label: { display: true, content: 'Hog: ' + formatMomentN(diag.minM), position: 'start',
+                    backgroundColor: 'rgba(131,24,67,0.9)', color: '#fbcfe8', font: { size: 10, weight: 'bold' }, padding: 4, borderRadius: 4 }
+            };
+        }
+
+        // Zero shear lines on BMD
+        diag.zeroShearPoints.forEach(function(zs, i) {
+            bmdAnno['zs' + i] = {
+                type: 'line', xMin: zs, xMax: zs,
+                borderColor: 'rgba(251,191,36,0.35)', borderWidth: 1.5, borderDash: [3, 3],
+                label: { display: true, content: 'V=0', position: 'start',
+                    backgroundColor: 'rgba(120,53,15,0.8)', color: '#fde68a', font: { size: 9 }, padding: 2, borderRadius: 3 }
+            };
+        });
+
+        // Common chart options factory
+        function makeOpts(annotations, yLabel) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 200 },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#cbd5e1',
+                        borderColor: '#334155', borderWidth: 1, padding: 10, cornerRadius: 8,
+                        callbacks: {
+                            title: function(items) { return 'x = ' + parseFloat(items[0].label).toFixed(2) + ' m'; },
+                            label: function(item) {
+                                var v = item.parsed.y;
+                                return yLabel + ': ' + v.toFixed(2);
+                            }
+                        }
+                    },
+                    annotation: { annotations: annotations }
+                },
+                scales: {
+                    x: {
+                        type: 'linear', min: 0, max: L,
+                        title: { display: true, text: 'Position (m)', color: '#64748b', font: { size: 11 } },
+                        ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 20,
+                            callback: function(v) { return Number.isInteger(v) ? v : v.toFixed(1); }
+                        },
+                        grid: { color: 'rgba(51,65,85,0.25)', lineWidth: 0.5 }
+                    },
+                    y: {
+                        title: { display: true, text: yLabel, color: '#64748b', font: { size: 11 } },
+                        ticks: { color: '#475569', font: { size: 10 },
+                            callback: function(v) {
+                                if (Math.abs(v) >= 10000) return (v/1000).toFixed(0) + 'k';
+                                if (Math.abs(v) >= 1000) return (v/1000).toFixed(1) + 'k';
+                                return v.toFixed(1);
+                            }
+                        },
+                        grid: { color: 'rgba(51,65,85,0.2)', lineWidth: 0.5 }
+                    }
+                }
+            };
+        }
+
+        // Build data arrays for Chart.js
+        var sfdData = diag.x.map(function(xi, i) { return { x: xi, y: diag.V[i] }; });
+        var bmdData = diag.x.map(function(xi, i) { return { x: xi, y: diag.M[i] }; });
+
+        clearCharts();
+
+        // SFD: tension = 0 for piecewise linear
+        var sfdOpts = makeOpts(sfdAnno, 'Shear Force (N)');
+        sfdOpts.elements = { point: { radius: 0 }, line: { tension: 0, borderWidth: 2.5 } };
+
+        sfdChart = new Chart(document.getElementById('sfd'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'SFD', data: sfdData,
+                    borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.07)',
+                    fill: 'origin', pointRadius: 0, pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#f87171'
+                }]
+            },
+            options: sfdOpts
+        });
+
+        // BMD: tension for smooth parabolic curves under distributed loads
+        var hasDistLoads = udls.length > 0 || uvls.length > 0;
+        var bmdOpts = makeOpts(bmdAnno, 'Bending Moment (N·m)');
+        bmdOpts.elements = {
+            point: { radius: 0 },
+            line: { tension: hasDistLoads ? 0.3 : 0, borderWidth: 2.5 }
+        };
+
+        bmdChart = new Chart(document.getElementById('bmd'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'BMD', data: bmdData,
+                    borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.07)',
+                    fill: 'origin', pointRadius: 0, pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#34d399'
+                }]
+            },
+            options: bmdOpts
+        });
+    }
+
+    /* ============================
+       EVENT HANDLERS
+       ============================ */
+
+    /**
+     * Double-click handler: open edit panel for an element
+     */
+    function onBoxDblClick(e) {
+        var el = e.target.closest('.support, .load-el, .udl-el, .uvl-el, .moment-el');
+        if (!el) return;
+        var found = elements.find(function(e2) { return e2.dom === el; });
+        if (found) openEdit(found.id);
+    }
+
+    /**
+     * Click on empty beam area: deselect
+     */
+    function onBoxMouseDown(e) {
+        if (e.target === boxEl || e.target.id === 'beam' || e.target.id === 'beamScale') {
+            selectedId = null;
+            updateAllDOM();
+            closeEdit();
+        }
+    }
+
+    /**
+     * Keyboard handler: Delete/Backspace to delete, Escape to deselect
+     */
+    function onKeyDown(e) {
+        var tag = document.activeElement ? document.activeElement.tagName : '';
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selectedId !== null) { e.preventDefault(); deleteSelected(); }
+        }
+        if (e.key === 'Escape') {
+            closeEdit();
+            selectedId = null;
+            updateAllDOM();
+        }
+    }
+
+    /**
+     * Window resize handler: update beam visual positions
+     */
+    var resizeTimer = null;
+    function onResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() { updateAllDOM(); }, 100);
+    }
+
+    /* ============================
+       INITIALIZATION
+       ============================ */
+
+    /**
+     * Initialize the application: set up DOM refs, event listeners, default elements
+     * Called after Chart.js and annotation plugin are confirmed loaded
+     */
+    function init() {
+        // Cache DOM references
+        boxEl = document.getElementById('beamBox');
+        warnEl = document.getElementById('warning');
+        infoEl = document.getElementById('info');
+        lengthInput = document.getElementById('L');
+        unitSelect = document.getElementById('unitSelect');
+
+        // Event listeners
+        boxEl.addEventListener('dblclick', onBoxDblClick);
+        boxEl.addEventListener('mousedown', onBoxMouseDown);
+        document.addEventListener('keydown', onKeyDown);
+        window.addEventListener('resize', onResize);
+
+        // Create default demo configuration
+        elements = [
+            { id: nextId++, type: 'support', x: 0, supportType: 'pin', dom: null },
+            { id: nextId++, type: 'support', x: 10, supportType: 'roller', dom: null },
+            { id: nextId++, type: 'load', x: 5, force: 5000, displayVal: 5000, displayUnit: 'N', dom: null }
+        ];
+        elements.forEach(createDOM);
+        updateScale();
+
+        // Mark charts as ready and do initial calculation
+        chartsReady = true;
+        recalc();
+    }
+
+    // ============================
+    // BOOT SEQUENCE (embed-safe)
+    // ============================
+
+    /**
+     * Safe boot: wait for DOM and Chart.js to be ready, then initialize
+     * Uses polling to handle iframe/CMS environments where load events may not fire normally
+     */
+    function boot() {
+        // Wait for DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() { pollForChartJS(); });
+        } else {
+            pollForChartJS();
+        }
+    }
+
+    /**
+     * Poll until Chart.js and annotation plugin are available
+     * Handles cases where scripts load after our code executes (iframes, async loading)
+     */
+    function pollForChartJS() {
+        var attempts = 0;
+        var maxAttempts = 200; // 10 seconds at 50ms intervals
+        var interval = setInterval(function() {
+            attempts++;
+            // Check both Chart.js and annotation plugin
+            var chartOk = typeof Chart !== 'undefined' && typeof Chart.register === 'function';
+            var annoOk = false;
+            if (chartOk) {
+                // Check if annotation plugin is available
+                // The plugin auto-registers when loaded after Chart.js
+                try {
+                    // chartjs-plugin-annotation@3.x auto-registers
+                    annoOk = true;
+                } catch(e) {
+                    annoOk = false;
+                }
+            }
+            if (chartOk && annoOk) {
+                clearInterval(interval);
+                try { init(); } catch(e) { console.error('Beam init error:', e); }
+            } else if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                console.error('Beam: Failed to load Chart.js or annotation plugin');
+                // Show error in warning area
+                var w = document.getElementById('warning');
+                if (w) {
+                    w.className = 'show warn-red';
+                    w.style.display = 'flex';
+                    w.innerHTML = 'Error: Chart.js failed to load. Check network connection.';
+                }
+            }
+        }, 50);
+    }
+
+    // Start the boot sequence
+    boot();
+
+    // ============================
+    // PUBLIC API (exposed for onclick handlers)
+    // ============================
+    return {
+        addSupport: addSupport,
+        addLoad: addLoad,
+        addUDL: addUDL,
+        addUVL: addUVL,
+        addMoment: addMoment,
+        deleteSelected: deleteSelected,
+        resetAll: resetAll,
+        onUnitChange: onUnitChange,
+        onBeamLengthChange: onBeamLengthChange,
+        applyEdit: applyEdit,
+        closeEdit: closeEdit
+    };
+
+})();
+</script>
+</body>
+</html>
